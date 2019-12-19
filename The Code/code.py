@@ -2,6 +2,7 @@ import time
 import os
 import board
 import displayio
+import terminalio
 import busio
 from digitalio import DigitalInOut
 from analogio import AnalogIn
@@ -15,7 +16,7 @@ from adafruit_display_text.label import Label
 from adafruit_button import Button
 import adafruit_touchscreen
 import adafruit_logging as logging
-
+import adafruit_pyportal
 from adafruit_minimqtt import MQTT
 
 # ------------- WiFi ------------- #
@@ -42,31 +43,20 @@ wifi = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(esp, secrets, status_lig
 i2c_bus = busio.I2C(board.SCL, board.SDA)
 adt = adafruit_adt7410.ADT7410(i2c_bus, address=0x48)
 adt.high_resolution = True
-
+temperature = "blaa"
 # init. the light sensor
 light_sensor = AnalogIn(board.LIGHT)
 
 # init. the motion sensor
 movement_sensor = DigitalInOut(board.D3)
 
+button1_state = 0
+button2_state = 0
+
 # ------------- Screen eliments ------------- #
 
-# the current working directory (where this file is)
-cwd = ("/"+__file__).rsplit('/', 1)[0]
-fonts = [file for file in os.listdir(cwd+"/fonts/")
-         if (file.endswith(".bdf") and not file.startswith("._"))]
-for i, filename in enumerate(fonts):
-    fonts[i] = cwd+"/fonts/"+filename
-print(fonts)
-THE_FONT = "/fonts/Arial-12.bdf"
-DISPLAY_STRING = "Button Text"
+display = board.DISPLAY
 
-# Make the display context
-splash = displayio.Group(max_size=20)
-board.DISPLAY.show(splash)
-BUTTON_WIDTH = 80
-BUTTON_HEIGHT = 40
-BUTTON_MARGIN = 20
 
 def set_backlight(val):
     """Adjust the TFT backlight.
@@ -77,35 +67,66 @@ def set_backlight(val):
     board.DISPLAY.auto_brightness = False
     board.DISPLAY.brightness = val
 
-# Load the font
-font = bitmap_font.load_font(THE_FONT)
-
 ts = adafruit_touchscreen.Touchscreen(board.TOUCH_XL, board.TOUCH_XR,
                                       board.TOUCH_YD, board.TOUCH_YU,
                                       calibration=((5200, 59000), (5800, 57000)),
                                       size=(320, 240))
 
+# Load the font
+font = terminalio.FONT
+
+DISPLAY_STRING = "Button Text"
+
+# Make the display context
+splash = displayio.Group(max_size=200)
+board.DISPLAY.show(splash)
+BUTTON_WIDTH = 100
+BUTTON_HEIGHT = 100
+BUTTON_MARGIN = 10
+
 buttons = []
 # Default button styling:
-button_0 = Button(x=BUTTON_MARGIN, y=BUTTON_MARGIN,
-                  width=BUTTON_WIDTH, height=BUTTON_HEIGHT,
-                  label="button0", label_font=font)
-buttons.append(button_0)
 
 # a roundrect
-button_1 = Button(x=BUTTON_MARGIN*2+BUTTON_WIDTH, y=BUTTON_MARGIN*2+BUTTON_HEIGHT,
+button_1 = Button(x=BUTTON_MARGIN, y=BUTTON_MARGIN,
                   width=BUTTON_WIDTH, height=BUTTON_HEIGHT,
-                  label="button1", label_font=font, style=Button.ROUNDRECT)
+                  label="Button 1", label_font=font, label_color=0x0000FF,
+                  fill_color=0x00FF00, outline_color=0xFF0000)
 buttons.append(button_1)
 
 # a shadowrect
-button_2 = Button(x=BUTTON_MARGIN*3+BUTTON_WIDTH*2, y=BUTTON_MARGIN*2+BUTTON_HEIGHT,
+button_2 = Button(x=BUTTON_MARGIN, y=BUTTON_MARGIN*2+BUTTON_HEIGHT,
                   width=BUTTON_WIDTH, height=BUTTON_HEIGHT,
-                  label="button2", label_font=font, style=Button.SHADOWRECT)
+                  label="Button 2", label_font=font, label_color=0x0000FF,
+                  fill_color=0x00FF00, outline_color=0xFF0000)
 buttons.append(button_2)
 
 for b in buttons:
     splash.append(b.group)
+
+temperature_label = Label(terminalio.FONT, text="temperature", color=0x0000FF, max_glyphs=40)
+# Set the location
+temperature_label.x = 200
+temperature_label.y = 10
+splash.append(temperature_label)
+
+light_label = Label(terminalio.FONT, text="lux", color=0x0000FF, max_glyphs=40)
+# Set the location
+light_label.x = 200
+light_label.y = 30
+splash.append(light_label)
+
+feed1_label = Label(terminalio.FONT, text="MQTT feed", color=0x0000FF, max_glyphs=40)
+# Set the location
+feed1_label.x = 200
+feed1_label.y = 100
+splash.append(feed1_label)
+
+feed2_label = Label(terminalio.FONT, text="MQTT feed2", color=0x0000FF, max_glyphs=40)
+# Set the location
+feed2_label.x = 200
+feed2_label.y = 130
+splash.append(feed2_label)
 
 # ------------- Topic Setup ------------- #
 
@@ -149,6 +170,7 @@ wifi.connect()
 # Set up a MiniMQTT Client
 client = MQTT(socket,
             broker = secrets['broker'],
+            port = 1883,
             username = secrets['user'],
             password = secrets['pass'],
             network_manager = wifi)
@@ -172,18 +194,29 @@ while True:
 
     # Send a new message
     light_value = light_sensor.value
+    light_label.text = 'Light Sensor: {}'.format(light_value)
     temperature = adt.temperature
+    temperature_label.text = 'Temp Sensor: {}'.format(temperature)
     movement_value = movement_sensor.value
-    button1_state = 0
-    button2_state = 0
+
+    feed1_label.text = 'MQTT Feed1:'
+    feed2_label.text = 'MQTT Feed2:'
 
     touch = ts.touch_point
     if touch:
         for i, b in enumerate(buttons):
             if b.contains(touch):
-                print("Button %d pressed" % i)
+                print('Sending button%d pressed' % i)
+                if i == 0:
+                    button1_state = 1
+                if i == 1:
+                    button2_state = 1
                 b.selected = True
             else:
+                if i == 0:
+                    button1_state = 0
+                if i == 1:
+                    button2_state = 0
                 b.selected = False
 
     print('Sending light sensor value: %d' % light_value)
@@ -193,13 +226,12 @@ while True:
     client.publish(mqtt_temperature, temperature)
 
     print('Sending motion sensor value: %d' % movement_value)
-    client.publish(mqtt_PIR, movement_value)
+    client.publish(mqtt_PIR, "movement_value")
 
-    print('Sending button 1 state: %d' % button1_state)
+    print('Sending button 1 state: ')
     client.publish(mqtt_button1, button1_state)
 
-    print('Sending button 2 state: %d' % button2_state)
+    print('Sending button 2 state: ')
     client.publish(mqtt_button2, button2_state)
 
     time.sleep(0.5)
-
