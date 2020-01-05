@@ -1,0 +1,31 @@
+sensor:
+  - platform: mqtt
+    name: "Temperature"
+    state_topic: "pyportal/temperature"
+    unit_of_measurement: '°C'
+  - platform: mqtt
+    name: "Light"
+    state_topic: "pyportal/lux"
+    unit_of_measurement: 'Lux'
+
+binary_sensor:
+  - platform: mqtt
+    name: Movment
+    state_topic: "pyportal/pir"
+    payload_on: "1"
+    payload_off: "0"
+  - platform: mqtt
+    name: Button2
+    state_topic: "pyportal/button2"
+    payload_on: "1"
+    payload_off: "0"
+
+switch:
+  - platform: mqtt
+    name: Button1
+    command_topic: "pyportal/button1"
+    state_topic: "pyportal/button1"
+    payload_on: "1"
+    payload_off: "0"
+    state_on: "1"
+    state_off: "0"
