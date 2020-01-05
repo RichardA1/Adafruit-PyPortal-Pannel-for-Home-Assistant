@@ -1,3 +1,4 @@
+# Add the following code to the Sensor group in your config file
 sensor:
   - platform: mqtt
     name: "Temperature"
@@ -8,6 +9,7 @@ sensor:
     state_topic: "pyportal/lux"
     unit_of_measurement: 'Lux'
 
+# Add the following code to the Binary Sensor group in your config file
 binary_sensor:
   - platform: mqtt
     name: Movment
@@ -20,6 +22,7 @@ binary_sensor:
     payload_on: "1"
     payload_off: "0"
 
+# Add the following code to the Switch group in your config file
 switch:
   - platform: mqtt
     name: Button1
